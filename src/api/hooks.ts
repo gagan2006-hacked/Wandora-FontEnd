@@ -1,0 +1,87 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys as keys } from './queryKeys'
+import { adminApi, bookingApi, discoveryApi, driveApi, hostApi, hostPropertyApi, hotelSearchApi, plansApi, profileApi, type HotelSearchParams } from './features'
+import type { BookingRequest, CreatePlanRequest, ItineraryItem, PaymentVerification, PlanStatus, UpdatePlanRequest, UpdateProfileRequestDto } from '../types/api'
+
+export const featureHooks = {
+  useProfile: () => useQuery({ queryKey: keys.profile, queryFn: profileApi.get }),
+  useUsers: (page: number, size = 20) => useQuery({ queryKey: [...keys.users, page, size], queryFn: () => discoveryApi.users(page, size) }),
+  useFriendships: () => useQuery({ queryKey: keys.friendships, queryFn: discoveryApi.friendships }),
+  useFriendshipStatus: (id: number) => useQuery({ queryKey: ['friendship', id], queryFn: () => discoveryApi.status(id), enabled: id > 0 }),
+  useHotelSearch: (params: HotelSearchParams, enabled = true) => useQuery({ queryKey: keys.hotelSearch(params), queryFn: () => hotelSearchApi.search(params), enabled }),
+  useHotel: (id: number) => useQuery({ queryKey: keys.hotelDetail(id), queryFn: () => hotelSearchApi.detail(id), enabled: id > 0 }),
+  useBookings: () => useQuery({ queryKey: keys.bookings, queryFn: bookingApi.list }),
+  useDrive: (bookingId: number) => useQuery({ queryKey: keys.drive(bookingId), queryFn: () => driveApi.forBooking(bookingId), enabled: bookingId > 0 }),
+  useDrivePhotos: (driveId: number, page = 0) => useQuery({ queryKey: keys.drivePhotos(driveId, page), queryFn: () => driveApi.photos(driveId, page), enabled: driveId > 0 }),
+  useTravelPlans: (page = 0, size = 20) => useQuery({ queryKey: keys.travelPlans(page), queryFn: () => plansApi.list(page, size) }),
+  usePlan: (id: number) => useQuery({ queryKey: keys.plan(id), queryFn: () => plansApi.get(id), enabled: id > 0 }),
+  usePlanMembers: (id: number) => useQuery({ queryKey: keys.planMembers(id), queryFn: () => plansApi.members(id), enabled: id > 0 }),
+  usePlanInvitations: (page = 0) => useQuery({ queryKey: keys.planInvitations(page), queryFn: () => plansApi.invitations(page) }),
+  usePlanItinerary: (id: number) => useQuery({ queryKey: keys.planItinerary(id), queryFn: () => plansApi.itinerary(id), enabled: id > 0 }),
+  usePlanStays: (id: number) => useQuery({ queryKey: keys.planStays(id), queryFn: () => plansApi.stayOptions(id), enabled: id > 0 }),
+  usePlanMessages: (id: number, page = 0) => useQuery({ queryKey: keys.planMessages(id, page), queryFn: () => plansApi.messages(id, page), enabled: id > 0 }),
+  usePlanBookings: (id: number) => useQuery({ queryKey: keys.planBookings(id), queryFn: () => plansApi.bookings(id), enabled: id > 0 }),
+  useHostApplication: () => useQuery({ queryKey: keys.hostApplication, queryFn: hostApi.applicationStatus, retry: false }),
+  useHostHotelApplication: () => useQuery({ queryKey: keys.hostHotelApplication, queryFn: hostPropertyApi.hotelApplicationStatus, retry: false }),
+  useAdminSummary: () => useQuery({ queryKey: [...keys.admin, 'summary'], queryFn: adminApi.summary, retry: false }),
+  useAdminHotels: (params: { page: number; size: number; city?: string; active?: boolean }) => useQuery({ queryKey: keys.adminHotels(params), queryFn: () => adminApi.hotels(params), retry: false }),
+  useAdminHotelApplications: (params: { page: number; size: number; status?: string }) => useQuery({ queryKey: keys.adminHotelApplications(params), queryFn: () => adminApi.hotelApplications(params), retry: false }),
+  useAdminHostApplications: (params: { page: number; size: number; status?: string }) => useQuery({ queryKey: keys.adminHostApplications(params), queryFn: () => adminApi.hostApplications(params), retry: false }),
+}
+
+export function useFeatureMutations() {
+  const client = useQueryClient()
+  const invalidate = (...queryKeys: ReadonlyArray<readonly unknown[]>) => Promise.all(queryKeys.map((queryKey) => client.invalidateQueries({ queryKey })))
+  return {
+    updateProfile: useMutation({ mutationFn: (data: UpdateProfileRequestDto) => profileApi.update(data), onSuccess: () => invalidate(keys.profile, ['auth', 'profile']) }),
+    uploadProfileImage: useMutation({ mutationFn: ({ file, onProgress }: { file: File; onProgress?: (percent: number) => void }) => profileApi.uploadImage(file, onProgress), onSuccess: () => invalidate(keys.profile, ['auth', 'profile']) }),
+    addPhone: useMutation({ mutationFn: (phone: string) => profileApi.addPhone(phone), onSuccess: () => invalidate(keys.profile, ['auth', 'profile']) }),
+    removePhone: useMutation({ mutationFn: (phone: string) => profileApi.removePhone(phone), onSuccess: () => invalidate(keys.profile, ['auth', 'profile']) }),
+    sendFriendRequest: useMutation({ mutationFn: discoveryApi.sendRequest, onSuccess: (_data, id) => invalidate(keys.friendships, keys.users, ['friendship', id]) }),
+    removeFriend: useMutation({ mutationFn: discoveryApi.remove, onSuccess: (_data, id) => invalidate(keys.friendships, ['friendship', id]) }),
+    createBooking: useMutation({ mutationFn: (data: BookingRequest) => bookingApi.create(data), onSuccess: () => invalidate(keys.bookings) }),
+    addGuests: useMutation({ mutationFn: ({ bookingId, userIds }: { bookingId: number; userIds: number[] }) => bookingApi.guests(bookingId, userIds), onSuccess: () => invalidate(keys.bookings) }),
+    cancelBooking: useMutation({ mutationFn: bookingApi.cancel, onSuccess: () => invalidate(keys.bookings) }),
+    initiatePayment: useMutation({ mutationFn: bookingApi.initiatePayment }),
+    verifyPayment: useMutation({ mutationFn: (data: PaymentVerification) => bookingApi.verifyPayment(data), onSuccess: () => invalidate(keys.bookings) }),
+    uploadDrivePhoto: useMutation({ mutationFn: ({ driveId, file }: { driveId: number; file: File }) => driveApi.upload(driveId, file), onSuccess: (_data, input) => invalidate(keys.drivePhotos(input.driveId, 0)) }),
+    deleteDrivePhoto: useMutation({ mutationFn: ({ driveId, photoId }: { driveId: number; photoId: number }) => driveApi.remove(driveId, photoId), onSuccess: (_data, input) => invalidate(keys.drivePhotos(input.driveId, 0)) }),
+    createPlan: useMutation({ mutationFn: (data: CreatePlanRequest) => plansApi.create(data), onSuccess: () => invalidate(['travel-plans']) }),
+    updatePlan: useMutation({ mutationFn: ({ id, payload }: { id: number; payload: UpdatePlanRequest }) => plansApi.update(id, payload), onSuccess: (_data, input) => invalidate(['travel-plans'], keys.plan(input.id)) }),
+    cancelPlan: useMutation({ mutationFn: plansApi.cancel, onSuccess: () => invalidate(['travel-plans']) }),
+    updatePlanStatus: useMutation({ mutationFn: ({ id, status }: { id: number; status: PlanStatus }) => plansApi.updateStatus(id, status), onSuccess: (_data, input) => invalidate(['travel-plans'], keys.plan(input.id)) }),
+    removePlanMember: useMutation({ mutationFn: ({ id, userId }: { id: number; userId: number }) => plansApi.removeMember(id, userId), onSuccess: (_data, input) => invalidate(keys.planMembers(input.id)) }),
+    addPlanStay: useMutation({ mutationFn: ({ id, payload }: { id: number; payload: { hotelId: number; notes?: string; estimatedPrice?: number; selected?: boolean } }) => plansApi.addStayOption(id, payload), onSuccess: (_data, input) => invalidate(keys.planStays(input.id)) }),
+    updatePlanStay: useMutation({ mutationFn: ({ id, optionId, payload }: { id: number; optionId: number; payload: { notes?: string; estimatedPrice?: number; selected?: boolean } }) => plansApi.updateStayOption(id, optionId, payload), onSuccess: (_data, input) => invalidate(keys.planStays(input.id)) }),
+    deletePlanStay: useMutation({ mutationFn: ({ id, optionId }: { id: number; optionId: number }) => plansApi.deleteStayOption(id, optionId), onSuccess: (_data, input) => invalidate(keys.planStays(input.id)) }),
+
+    addPlanItem: useMutation({ mutationFn: ({ id, payload }: { id: number; payload: Omit<ItineraryItem, 'id' | 'travelPlanId' | 'createdBy'> }) => plansApi.addItinerary(id, payload), onSuccess: (_data, input) => invalidate(keys.planItinerary(input.id)) }),
+    updatePlanItem: useMutation({ mutationFn: ({ id, itemId, payload }: { id: number; itemId: number; payload: Partial<ItineraryItem> }) => plansApi.updateItinerary(id, itemId, payload), onSuccess: (_data, input) => invalidate(keys.planItinerary(input.id)) }),
+    deletePlanItem: useMutation({ mutationFn: ({ id, itemId }: { id: number; itemId: number }) => plansApi.deleteItinerary(id, itemId), onSuccess: (_data, input) => invalidate(keys.planItinerary(input.id)) }),
+    reorderPlanItems: useMutation({ mutationFn: ({ id, itemIds }: { id: number; itemIds: number[] }) => plansApi.reorderItinerary(id, itemIds), onSuccess: (_data, input) => invalidate(keys.planItinerary(input.id)) }),
+    invitePlanMember: useMutation({ mutationFn: ({ id, userId }: { id: number; userId: number }) => plansApi.invite(id, userId), onSuccess: (_data, input) => invalidate(keys.planMembers(input.id)) }),
+    respondToInvitation: useMutation({ mutationFn: ({ id, status }: { id: number; status: 'ACCEPTED' | 'DECLINED' }) => plansApi.respond(id, status), onSuccess: (_data, input) => invalidate(['travel-plan-invitations'], keys.planMembers(input.id)) }),
+
+    sendPlanMessage: useMutation({ mutationFn: ({ id, content }: { id: number; content: string }) => plansApi.sendMessage(id, content), onSuccess: (_data, input) => invalidate(keys.planMessages(input.id, 0)) }),
+    linkPlanBooking: useMutation({ mutationFn: ({ id, bookingId }: { id: number; bookingId: number }) => plansApi.linkBooking(id, bookingId), onSuccess: (_data, input) => invalidate(keys.planBookings(input.id)) }),
+    unlinkPlanBooking: useMutation({ mutationFn: ({ id, linkId }: { id: number; linkId: number }) => plansApi.unlinkBooking(id, linkId), onSuccess: (_data, input) => invalidate(keys.planBookings(input.id)) }),
+    createHostApplication: useMutation({ mutationFn: ({ businessName, files }: { businessName: string; files: { pan: File; aadhaar: File; photo: File } }) => hostApi.submitApplication(businessName, files), onSuccess: () => invalidate(keys.hostApplication) }),
+    createHostProfile: useMutation({ mutationFn: (data: Parameters<typeof hostApi.create>[0]) => hostApi.create(data), onSuccess: () => invalidate(keys.host) }),
+    updateHostProfile: useMutation({ mutationFn: (data: { hostName: string; active: boolean; description?: string }) => hostApi.update(data), onSuccess: () => invalidate(keys.host) }),
+    requestHostPhoneOtp: useMutation({ mutationFn: hostApi.requestPhoneOtp }),
+    confirmHostPhoneOtp: useMutation({ mutationFn: ({ value, code }: { value: string; code: string }) => hostApi.verifyPhoneOtp(value, code), onSuccess: () => invalidate(keys.host) }),
+    requestHostEmailOtp: useMutation({ mutationFn: hostApi.requestEmailOtp }),
+    confirmHostEmailOtp: useMutation({ mutationFn: ({ value, code }: { value: string; code: string }) => hostApi.verifyEmailOtp(value, code), onSuccess: () => invalidate(keys.host) }),
+    submitHotelApplication: useMutation({ mutationFn: hostPropertyApi.submitHotelApplication, onSuccess: () => invalidate(keys.hostHotelApplication) }),
+    createHotel: useMutation({ mutationFn: hostPropertyApi.createHotel, onSuccess: () => invalidate(keys.hostHotels) }),
+    updateHotel: useMutation({ mutationFn: ({ id, payload }: { id: number; payload: { amenities?: string[]; active?: boolean } }) => hostPropertyApi.updateHotel(id, payload), onSuccess: (_data, input) => invalidate(keys.hostHotels, keys.hostHotel(input.id)) }),
+    uploadHotelPhoto: useMutation({ mutationFn: ({ hotelId, file }: { hotelId: number; file: File }) => hostPropertyApi.addHotelPhoto(hotelId, file), onSuccess: (_data, input) => invalidate(keys.hostHotel(input.hotelId)) }),
+    deleteHotelPhoto: useMutation({ mutationFn: ({ hotelId, filePath }: { hotelId: number; filePath: string }) => hostPropertyApi.removeHotelPhoto(hotelId, filePath), onSuccess: (_data, input) => invalidate(keys.hostHotel(input.hotelId)) }),
+    createRoom: useMutation({ mutationFn: ({ application, photos }: { application: Record<string, unknown>; photos: File[] }) => hostPropertyApi.createRoom(application, photos), onSuccess: (_data, input) => invalidate(keys.hostRooms(Number(input.application.hotelId))) }),
+    deactivateRoom: useMutation({ mutationFn: hostPropertyApi.deactivateRoom, onSuccess: () => client.invalidateQueries({ queryKey: ['host'] }) }),
+    approveHostApplication: useMutation({ mutationFn: adminApi.approveHost, onSuccess: () => invalidate(keys.admin) }),
+    rejectHostApplication: useMutation({ mutationFn: ({ id, reason }: { id: number; reason: string }) => adminApi.rejectHost(id, reason), onSuccess: () => invalidate(keys.admin) }),
+    approveHotelApplication: useMutation({ mutationFn: adminApi.approveHotel, onSuccess: () => invalidate(keys.admin) }),
+    rejectHotelApplication: useMutation({ mutationFn: ({ id, reason }: { id: number; reason: string }) => adminApi.rejectHotel(id, reason), onSuccess: () => invalidate(keys.admin) }),
+  }
+}
