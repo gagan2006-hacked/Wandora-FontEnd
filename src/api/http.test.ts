@@ -6,9 +6,12 @@ import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'ax
 describe('API configuration', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('uses the local backend default while retaining the configured base URL override', () => {
-    expect(createApiClient().defaults.baseURL).toBe('http://localhost:8080')
+  it('uses the same-origin dev proxy by default and keeps the configured base URL override', () => {
+    // In development the browser talks to the Vite origin; the dev server proxies /api and
+    // the /host API paths to the backend. A configured VITE_API_BASE_URL always wins.
+    expect(createApiClient().defaults.baseURL).toBe(import.meta.env.DEV ? '' : 'http://localhost:8080')
     expect(createApiClient('https://api.example.test').defaults.baseURL).toBe('https://api.example.test')
+    expect(createApiClient('https://api.example.test/').defaults.baseURL).toBe('https://api.example.test')
   })
 
   it('configures credentialed cookie requests on the shared Axios client', () => {
