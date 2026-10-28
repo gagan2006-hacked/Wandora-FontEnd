@@ -2,6 +2,30 @@
 
 The supplied `wandora-apis.json` is the source of truth. The Swagger HTML is cross-checked for operation presence. The frontend never presents sample accommodation or invented backend success as live data.
 
+## Authentication-aware navigation
+
+- Public routes stay public: `/`, `/stays`, `/stays/:hotelId`, `/login`, `/register`, `/verify-email`, `/host`
+  (invitation), `/forbidden` and the 404 fallback. Every `/app/*`, `/host/*` and `/admin/*` route is protected.
+- Opening a protected route while signed out redirects to `/login` and keeps the full intended destination
+  (pathname, query string and hash) in router state. After a successful login the visitor returns to that
+  destination when it is a safe internal path; otherwise they land on the home for their persisted roles
+  (`/app` for traveler and host accounts, `/admin` for admin-only accounts).
+- `/login` and `/register` are guest-only. The decision is taken once the session query has settled — never
+  while it is loading — and signed-in visitors are redirected to their intended destination or role home.
+  The register → verify-email hand-off is preserved: the guard defers its redirect by a tick and then renders
+  it declaratively, so a completed registration reaches `/verify-email` (covered by
+  `src/routes/guest-guard.test.tsx`) instead of being bounced straight to `/app`.
+- `/host` and `/host/*` require the persisted `HOST` role; `/admin/*` requires `ADMIN`. Missing roles render
+  `/forbidden`, which links back to the user's own workspace. The backend remains the authority.
+- The authenticated shell shows only the workspaces the persisted roles allow: traveler, host and admin
+  navigation are derived from `/api/auth/me/roles`, with a workspace switcher when more than one applies.
+  Switching workspaces is pure navigation and never changes roles or permissions.
+- Signed-in visitors see a "My Wandora" entry in the public header instead of login/join links.
+- Logout clears only in-memory session/query state and returns to the landing page. Expired sessions surface
+  as a sign-in prompt in API error states rather than a dead end.
+- Unknown paths inside the shell render an in-shell 404 so navigation stays available; `/dashboard` redirects
+  to `/app` for old links.
+
 ## Public experience and auth
 
 - `/` is the Wandora landing page. `/stays` searches live hotel inventory with documented city, dates, roomCount and pagination. Hotel cards show only API-returned fields and photo URLs; details use public hotel/room endpoints. `/stays/:hotelId` is the actual details route. Search is initiated only after the visitor submits the form; client validation requires both dates together and check-out after check-in. The form allows a complete date range or neither date, matching its fields; current backend search returns HTTP 500 for omitted dates (null date arithmetic) and valid-date searches (a `LinkedHashMap` to `Page` cast failure). See [security and integration notes](security-and-integration.md).

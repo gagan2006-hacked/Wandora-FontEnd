@@ -48,7 +48,7 @@ No operation is currently classified `Blocked by backend/environment` at the wir
 | Route | Screen | Domains it consumes |
 | --- | --- | --- |
 | `/` | HomePage (PublicLayout) | Hotel Search (search form), Authentication (nav state) |
-| `/stays` | PublicStaySearchPage | Hotel Search |
+| `/stays`, `/app/stays`, `/app/stays/:hotelId` | PublicStaySearchPage / PublicHotelDetailsPage (public or in-shell) | Hotel Search |
 | `/stays/:hotelId` | PublicHotelDetailsPage | Hotel Search, Rooms (public room cards) |
 | `/login`, `/register`, `/verify-email` | LoginPage / RegisterPage / VerifyEmailPage | Authentication |
 | `/app` | TravelerDashboard | My Profile, Bookings, travel-plan-controller, Friendships |
@@ -62,7 +62,8 @@ No operation is currently classified `Blocked by backend/environment` at the wir
 | `/admin` | AdminDashboardPage | Admin (summary) |
 | `/admin/hotels` | AdminHotelsPage | Admin (hotel list/detail) |
 | `/admin/applications` | AdminApplicationsPage | Admin (application lists, detail, documents, approve/reject) |
-| `/forbidden`, `*` | ForbiddenPage / NotFoundPage | none (guards and fallbacks) |
+| `/forbidden`, `*`, `/app/*`, `/host/*`, `/admin/*` | ForbiddenPage / NotFoundPage / WorkspaceNotFoundPage | none (guards and fallbacks) |
+| `/dashboard` | redirect to `/app` | none (legacy link) |
 
 ## Complete operation table
 

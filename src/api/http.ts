@@ -23,13 +23,21 @@ export class ApiRequestError extends Error {
   }
 }
 
-// VITE_API_BASE_URL is authoritative when set (see .env.example). With no env file present the
-// client falls back to the documented local backend origin instead of Vite's own origin.
+// VITE_API_BASE_URL is authoritative when set (see .env.example). Without it, development
+// calls the Vite origin and lets the dev proxy forward /api and the /host API paths to the
+// backend (first-party cookies, no local CORS); production keeps the documented fallback.
 const LOCAL_BACKEND_FALLBACK = 'http://localhost:8080'
 
-export function createApiClient(baseURL = (import.meta.env.VITE_API_BASE_URL || LOCAL_BACKEND_FALLBACK).replace(/\/+$/, '')) {
+function defaultBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL
+  if (configured) return configured.replace(/\/+$/, '')
+  if (import.meta.env.DEV) return ''
+  return LOCAL_BACKEND_FALLBACK
+}
+
+export function createApiClient(baseURL = defaultBaseUrl()) {
   const client = axios.create({
-    baseURL,
+    baseURL: baseURL.replace(/\/+$/, ''),
     withCredentials: true,
     headers: { Accept: 'application/json' },
   })

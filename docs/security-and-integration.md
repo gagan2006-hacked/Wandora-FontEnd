@@ -4,6 +4,15 @@
 
 `src/api/http.ts` reads `import.meta.env.VITE_API_BASE_URL`; the local example is `http://localhost:8080` in [.env.example](../.env.example). Vite serves at `http://localhost:5173`. Spring must allow that exact origin with credentialed CORS, explicitly permit the client methods and headers (JSON and multipart content), and configure cookies with a policy compatible with the local origin. `Access-Control-Allow-Origin: *` is not compatible with credentialed requests. The backend was not modified.
 
+## Local development proxy
+
+`vite.config.ts` binds the dev server to all interfaces and proxies `/api` plus the `/host` API paths to
+`VITE_API_PROXY_TARGET` (default `http://localhost:8080`). When `VITE_API_BASE_URL` is unset, the shared
+Axios client uses the same origin in development, so the HttpOnly session cookies are first-party and no
+CORS allowlist is needed locally. A configured `VITE_API_BASE_URL` always wins, and production builds keep
+the previous direct-backend fallback. Only the transport origin changed: no authentication flow, request
+body, header, cookie handling or authorization rule was modified.
+
 ## Cookie authentication and persisted roles
 
 The shared Axios client sets `withCredentials: true`. `ACCESS_TOKEN`/`REFRESH_TOKEN` remain backend-issued HttpOnly cookies. The UI never accesses or persists them, writes bearer headers, or stores frontend auth flags as an access decision. Session/role lookup comes from `GET /api/auth/me/roles`; route guards do not replace server-side authorization. Logout calls the backend and clears only in-memory state/query cache. `401`/`403` are presented as session/access errors.

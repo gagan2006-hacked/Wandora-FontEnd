@@ -56,6 +56,7 @@ export function TravelPlansPage() {
         setCreating(false)
         form.reset()
         void plansQuery.refetch()
+        showToast('Travel plan created.')
       },
     })
   }
@@ -81,7 +82,7 @@ export function TravelPlansPage() {
         ...(values.get('budget') ? { budget: Number(values.get('budget')) } : {}),
         ...(values.get('currency') ? { currency: String(values.get('currency')) } : {}),
       },
-    }, { onError: notifyError, onSuccess: () => setEditing(false) })
+    }, { onError: notifyError, onSuccess: () => { setEditing(false); showToast('Travel plan updated.') } })
   }
 
   const submit = (event: FormEvent<HTMLFormElement>, action: (form: HTMLFormElement, values: FormData) => void) => {
@@ -120,8 +121,8 @@ export function TravelPlansPage() {
               <b>{invitation.title || invitation.destination || 'Travel plan invitation'}</b>
               <small>{invitation.invitedByName ? `Invited by ${invitation.invitedByName}` : invitation.startDate && invitation.endDate ? `${invitation.startDate} — ${invitation.endDate}` : ''}</small>
               <div className="row-actions">
-                <button className="button button-soft" type="button" disabled={mutations.respondToInvitation.isPending || !invitation.travelPlanId} onClick={() => invitation.travelPlanId && mutations.respondToInvitation.mutate({ id: invitation.travelPlanId, status: 'ACCEPTED' }, { onError: notifyError, onSuccess: () => void invitationsQuery.refetch() })}>Accept</button>
-                <button className="button button-danger" type="button" disabled={mutations.respondToInvitation.isPending || !invitation.travelPlanId} onClick={() => invitation.travelPlanId && mutations.respondToInvitation.mutate({ id: invitation.travelPlanId, status: 'DECLINED' }, { onError: notifyError, onSuccess: () => void invitationsQuery.refetch() })}>Decline</button>
+                <button className="button button-soft" type="button" disabled={mutations.respondToInvitation.isPending || !invitation.travelPlanId} onClick={() => invitation.travelPlanId && mutations.respondToInvitation.mutate({ id: invitation.travelPlanId, status: 'ACCEPTED' }, { onError: notifyError, onSuccess: () => { void invitationsQuery.refetch(); showToast('Invitation accepted.') } })}>Accept</button>
+                <button className="button button-danger" type="button" disabled={mutations.respondToInvitation.isPending || !invitation.travelPlanId} onClick={() => invitation.travelPlanId && mutations.respondToInvitation.mutate({ id: invitation.travelPlanId, status: 'DECLINED' }, { onError: notifyError, onSuccess: () => { void invitationsQuery.refetch(); showToast('Invitation declined.') } })}>Decline</button>
               </div>
             </article>)}
           </DataState>
@@ -133,9 +134,9 @@ export function TravelPlansPage() {
             <header className="plan-detail-head">
               <div><span className="eyebrow">{plan.startDate} — {plan.endDate}</span><h2>{plan.title}</h2><p><MapPin size={14} /> {plan.destination}{plan.budget != null ? ` · ${formatCurrency(plan.budget, plan.currency || 'INR')} planned budget` : ''}</p><StatusBadge status={plan.status} /></div>
               <div className="plan-toolbar">
-                <label>Plan status<select aria-label="Travel plan status" value={plan.status || 'PLANNING'} onChange={(event) => mutations.updatePlanStatus.mutate({ id: plan.id, status: event.target.value as PlanStatus }, { onError: notifyError })} disabled={mutations.updatePlanStatus.isPending}><option>PLANNING</option><option>READY_TO_BOOK</option><option>BOOKED</option><option>COMPLETED</option><option>CANCELLED</option></select></label>
+                <label>Plan status<select aria-label="Travel plan status" value={plan.status || 'PLANNING'} onChange={(event) => mutations.updatePlanStatus.mutate({ id: plan.id, status: event.target.value as PlanStatus }, { onError: notifyError, onSuccess: () => showToast('Plan status updated.') })} disabled={mutations.updatePlanStatus.isPending}><option>PLANNING</option><option>READY_TO_BOOK</option><option>BOOKED</option><option>COMPLETED</option><option>CANCELLED</option></select></label>
                 <button className="button button-soft" type="button" onClick={() => setEditing((value) => !value)}>{editing ? 'Close edit' : 'Edit plan'}</button>
-                <ConfirmButton label="Cancel plan" confirmText="Cancel this travel plan?" onConfirm={() => mutations.cancelPlan.mutate(plan.id, { onError: notifyError, onSuccess: () => { setSelectedId(null); void plansQuery.refetch() } })} disabled={mutations.cancelPlan.isPending} />
+                <ConfirmButton label="Cancel plan" confirmText="Cancel this travel plan?" onConfirm={() => mutations.cancelPlan.mutate(plan.id, { onError: notifyError, onSuccess: () => { setSelectedId(null); void plansQuery.refetch(); showToast('Travel plan cancelled.') } })} disabled={mutations.cancelPlan.isPending} />
               </div>
             </header>
 
@@ -162,7 +163,7 @@ export function TravelPlansPage() {
                   const title = String(values.get('title'))
                   const activityDate = String(values.get('activityDate'))
                   if (activityDate < plan.startDate || activityDate > plan.endDate) return notifyError(new Error('Activity date must be within the plan dates.'))
-                  mutations.addPlanItem.mutate({ id: plan.id, payload: { title, activityDate, locationName: String(values.get('locationName') || '') } }, { onError: notifyError, onSuccess: () => form.reset() })
+                  mutations.addPlanItem.mutate({ id: plan.id, payload: { title, activityDate, locationName: String(values.get('locationName') || '') } }, { onError: notifyError, onSuccess: () => { form.reset(); showToast('Activity added to the itinerary.') } })
                 })}>
                   <label className="sr-only" htmlFor="activity-title">Activity</label><input id="activity-title" name="title" maxLength={160} placeholder="Activity" required />
                   <label className="sr-only" htmlFor="activity-date">Activity date</label><input id="activity-date" name="activityDate" type="date" required />
@@ -201,7 +202,7 @@ export function TravelPlansPage() {
                   <div className="message-list">{messages.data?.content.map((message) => <article key={message.id}><b>{message.senderName || 'Plan member'}</b><p>{message.content}</p><small>{message.createdAt ? new Date(message.createdAt).toLocaleString() : ''}</small></article>)}</div>
                   <Pagination page={messages.data?.number ?? messagePage} totalPages={messages.data?.totalPages ?? 0} onPage={setMessagePage} />
                 </DataState>
-                <form className="inline-form" onSubmit={(event) => submit(event, (form, values) => { mutations.sendPlanMessage.mutate({ id: plan.id, content: String(values.get('content')) }, { onError: notifyError, onSuccess: () => form.reset() }) })}>
+                <form className="inline-form" onSubmit={(event) => submit(event, (form, values) => { mutations.sendPlanMessage.mutate({ id: plan.id, content: String(values.get('content')) }, { onError: notifyError, onSuccess: () => { form.reset(); showToast('Message sent.') } }) })}>
                   <label className="sr-only" htmlFor="plan-message">Write a message</label><input id="plan-message" name="content" maxLength={4000} placeholder="Write a message" required />
                   <button className="button button-dark" disabled={mutations.sendPlanMessage.isPending}>{mutations.sendPlanMessage.isPending ? 'Sending…' : 'Send'}</button>
                 </form>
